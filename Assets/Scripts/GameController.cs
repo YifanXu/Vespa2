@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Text.RegularExpressions;
 
 public class GameController : MonoBehaviour
 {
@@ -33,8 +34,9 @@ public class GameController : MonoBehaviour
 
     // AI
     [Header("AI Settings")]
+    public bool aiAlwaysMove = false;
+    public bool clearTTBetweenMove = true;
     public int aiColor = Piece.Black;
-    public Thread aiCalculateThread;
     public int aiDepth = 6;
     public int aiMaxDepth = 20;
     public int aiMinTime = 1000;
@@ -57,9 +59,10 @@ public class GameController : MonoBehaviour
     {
         MoveGenerator.Init();
         Eval.Init();
-        TranspositionTable.Init(1890859);
+        TranspositionTable.Init(1890860);
 
         board = new Board();
+        //board = new Board("r2q1rk1/4bppp/p7/2p4N/Bn1pQ3/3P4/1PP3PP/R1B2RK1 w - - 4 21");
         //board = new Board("r5r1/p7/bpk1p2p/1p1p1ppP/2qP4/2P2Q2/PRP1N1PB/3K3R w - - 0 1");
         //board = new Board("5rk1/pQ3p1p/2p3p1/4brq1/2B5/2P4P/PP3PP1/3R1RK1 w - - 1 22");
         boardObject.RenderPieces(board.squares);
@@ -110,7 +113,8 @@ public class GameController : MonoBehaviour
             if (latestResult.Value.evalResult.line.Count > 0)
             {
                 Move moveToMake = latestResult.Value.evalResult.line.Peek();
-                currentMoveHistory.Add(moveToMake.ToAlgebraic(board));
+                currentMoveHistory.Add(moveToMake.ToComplexAlgebraic(board));
+                UpdateMoveList();
 
                 board.MakeMove(moveToMake);
 
@@ -128,13 +132,26 @@ public class GameController : MonoBehaviour
             UpdateDebugInfo(currentMoveList);
 
             // Ree
-            aiTask = Task.Run(AIMakeMove);
+            if (aiAlwaysMove)
+            {
+                aiTask = Task.Run(AIMakeMove);
+            }
         }
 
         if (aiTask != null && !aiTask.IsCompleted && !aiTask.IsCanceled)
         {
             debugOutput.text = GetString(liveDiagnostics);
         }
+    }
+
+    public void CopyMoveHistory ()
+    {
+        GUIUtility.systemCopyBuffer = Regex.Replace(moveHistoryOutput.text, "\\s+", " ");
+    }
+
+    public void CopyFen()
+    {
+        GUIUtility.systemCopyBuffer = board.ToString();
     }
 
     public void UpdateDebugInfo(List<Move> moveList)
@@ -149,6 +166,7 @@ public class GameController : MonoBehaviour
         string s = $"Turn={board.turn}({(board.colorToMove == Piece.White ? "white" : "black")})\nHistoryStackCount={board.moveHistory.Count}\nCastle={castleStr}\nHalfMove={board.halfMoveClock}\nEP={board.epSquare}\n\n";
         s += $"\"{board.ToString()}\"\n";
         s += $"Hash = {TranspositionTable.HashToHex(board.hash, 16)}\n";
+        s += $"FreshHash = {TranspositionTable.HashToHex((new Board(board.ToString())).hash, 16)}\n";
         s += $"TT Table = {TranspositionTable.hashTableOccupancy}/{TranspositionTable.tableSize}\n";
 
         if (showAIEval)
@@ -180,7 +198,7 @@ public class GameController : MonoBehaviour
             var newList = MoveGenerator.GetLegalMoves(board, Eval.OrderMoveList);
             foreach (var item in newList)
             {
-                s += $"{item.ToAlgebraic(board)}({item.ToString()}{(item.flag == Move.MoveFlag.None ? "" : $"(flag={item.flag}")})\n";
+                s += $"{item.ToSimpleAlgebraic(board)}({item.ToString()}{(item.flag == Move.MoveFlag.None ? "" : $"(flag={item.flag}")})\n";
             }
         }
 
@@ -209,6 +227,7 @@ public class GameController : MonoBehaviour
             if(isWhite)
             {
                 s.Append(turn);
+                s.Append('.');
                 s.Append(space);
                 s.Append(move);
 
@@ -276,7 +295,7 @@ public class GameController : MonoBehaviour
         }
 
         // Update Move History UI
-        currentMoveHistory.Add(move.ToAlgebraic(board));
+        currentMoveHistory.Add(move.ToComplexAlgebraic(board));
         UpdateMoveList();
 
         // Update Debug UI
@@ -337,7 +356,7 @@ public class GameController : MonoBehaviour
 
             // Rerender Pieces
             boardObject.RenderPieces(board.squares);
-            boardObject.RenderHighlight(board.moveHistory.Count == 0 ? new Move(-1, -1) : board.moveHistory.Peek());
+            boardObject.RenderHighlight(board.moveHistory.Count == 0 ? new Move(-1, -1, true) : board.moveHistory.Peek());
         }
         else
         {
@@ -347,6 +366,11 @@ public class GameController : MonoBehaviour
 
     private EngineResultSuite AIMakeMove ()
     {
+        if (clearTTBetweenMove)
+        {
+            TranspositionTable.Clear();
+        }
+
         liveDiagnostics = new Eval.EvalDiagnosticCount();
         cancelToken = cancelTokenSource.Token;
 
@@ -354,7 +378,7 @@ public class GameController : MonoBehaviour
         timer.Start();
 
         Eval.Result result = null;
-        for (int i = 1;aiDepth % 2 != 0 || i <= aiDepth * 2 || timer.ElapsedMilliseconds < aiMinTime; i++)
+        for (int i = 2; i <= aiDepth * 2 || timer.ElapsedMilliseconds < aiMinTime; i += 2)
         {
             result = Eval.Evaluate(board, i, liveDiagnostics, cancelToken);
             liveDiagnostics.latestDepth = i;
@@ -374,6 +398,7 @@ public class GameController : MonoBehaviour
 
     public string GetString (Eval.EvalDiagnosticCount diagnostics)
     {
+        if (diagnostics == null) return String.Empty;
         StringBuilder s = new StringBuilder();
         foreach (var field in diagnostics.GetType().GetFields())
         {

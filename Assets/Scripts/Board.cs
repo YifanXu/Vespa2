@@ -155,10 +155,6 @@ public class Board
         {
             return this.squares[id];
         }
-        set
-        {
-            this.squares[id] = value;
-        }
     }
 
     public int this[int rank, int file]
@@ -166,10 +162,6 @@ public class Board
         get
         {
             return this.squares[rank * 8 + file];
-        }
-        set
-        {
-            this.squares[rank * 8 + file] = value;
         }
     }
 
@@ -216,6 +208,7 @@ public class Board
             isCaptureOrPawnMove = true;
             enemyTable[targetPiece].pieceLocations.Remove(move.target);
             capture = targetPiece;
+            this.hash = TranspositionTable.HashTogglePiece(this.hash, targetPiece, move.target);
         }
 
         // Update the lookup table of the piece that is moving
@@ -234,7 +227,6 @@ public class Board
         // Update Hash
         this.hash = TranspositionTable.HashTogglePiece(this.hash, movingPiece, move.origin);
         if (move.flag != Move.MoveFlag.Promotion) this.hash = TranspositionTable.HashTogglePiece(this.hash, movingPiece, move.target);
-        if (targetPiece != 0) this.hash = TranspositionTable.HashTogglePiece(this.hash, movingPiece, move.target);
 
         // Remove Castle Rights if rook is captured
         if(targetPiece % 8 == Piece.Rook)

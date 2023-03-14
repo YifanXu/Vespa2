@@ -132,6 +132,11 @@ public static class TranspositionTable
         return array;
     }
 
+    public static void Clear()
+    {
+        hashTable = new TranspositionEntry[tableSize];
+    }
+
     // Hashing Functions
 
     /// <summary>

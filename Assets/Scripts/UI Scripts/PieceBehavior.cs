@@ -33,7 +33,7 @@ public class PieceBehavior : MonoBehaviour
                 if (target != this.location)
                 {
                     Debug.Log($"Move! Current Location = {location}, move to [{mouseBoardRank},{mouseBoardFile}]({target})");
-                    this.moveTo(new Move(location, target));
+                    this.moveTo(new Move(location, target, true));
                 } 
                 isDragged = false;
                 this.transform.position = homeLocation;

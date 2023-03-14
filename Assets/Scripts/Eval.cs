@@ -21,13 +21,16 @@ public static class Eval
         public Result (Result copy)
         {
             this.intEval = copy.intEval;
-            line = new Stack<Move>(copy.line);
+
+            // Duplicate stack
+            var arr = new Move[copy.line.Count];
+            copy.line.CopyTo(arr, 0);
+            Array.Reverse(arr);
+            this.line = new Stack<Move>(arr);
         }
 
         public static bool operator > (Result a, Result b)
         {
-            if (a == null) throw new ArgumentException("a is null");
-            if (b == null) throw new ArgumentException("b is null");
             return a.intEval > b.intEval;
         }
 
@@ -63,7 +66,7 @@ public static class Eval
 
         public string ToAlgebraic(Board b)
         {
-            return $"({(intEval > 0 ? "+" : "")}{intEval}){(line.Count == 0 ? "-" : line.Peek().ToAlgebraic(b))}";
+            return $"({(intEval > 0 ? "+" : "")}{intEval}){(line.Count == 0 ? "-" : line.Peek().ToSimpleAlgebraic(b))}";
         }
     }
 
@@ -105,9 +108,9 @@ public static class Eval
         -50,-40,-30,-30,-30,-30,-40,-50,
         -40,-20,  0,  0,  0,  0,-20,-40,
         -30,  0, 10, 15, 15, 10,  0,-30,
-        -30,  5, 15, 20, 20, 15,  5,-30,
-        -30,  0, 15, 20, 20, 15,  0,-30,
-        -30,  5, 10, 15, 15, 10,  5,-30,
+        -30,  5, 15, 15, 15, 15,  5,-30,
+        -30,  0, 15, 15, 15, 15,  0,-30,
+        -30,  5,  5, 10, 10,  5,  5,-30,
         -40,-20,  0,  5,  5,  0,-20,-40,
         -50,-40,-30,-30,-30,-30,-40,-50,
     };
@@ -130,16 +133,16 @@ public static class Eval
          -5,  0,  0,  0,  0,  0,  0, -5,
          -5,  0,  0,  0,  0,  0,  0, -5,
          -5,  0,  0,  0,  0,  0,  0, -5,
-         -5,  0,  0,  0,  0,  0,  0, -5,
-          0,  0,  0,  5,  5,  0,  0,  0
+         -5,  0,  0,  2,  2,  0,  0, -5,
+          0,  0,  2,  5,  5,  2,  0,  0
     };
     private static readonly int[] queenTable =
 {
         -20,-10,-10, -5, -5,-10,-10,-20,
         -10,  0,  0,  0,  0,  0,  0,-10,
         -10,  0,  5,  5,  5,  5,  0,-10,
-         -5,  0,  5,  5,  5,  5,  0, -5,
-          0,  0,  5,  5,  5,  5,  0, -5,
+         -5,  0,  5, 10, 10,  5,  0, -5,
+          0,  0,  5, 10, 10,  5,  0, -5,
         -10,  5,  5,  5,  5,  5,  0,-10,
         -10,  0,  5,  0,  0,  0,  0,-10,
         -20,-10,-10, -5, -5,-10,-10,-20
@@ -210,17 +213,17 @@ public static class Eval
         for(int i = 0; i < output.Length; i++)
         {
             int target = invertPosition ? ((7 - (i / 8)) * 8 + i % 8) : i;
-            output[i] = invertValues ? (-1 * table[target]) : table[target];
+            output[i] = invertValues ? (-table[target]) : table[target];
         }
         return output;
     }
 
-    public static Result Evaluate (Board b, int depth, EvalDiagnosticCount diagnostics, CancellationToken ct)
+    public static Result Evaluate (Board b, int depthRemain, EvalDiagnosticCount diagnostics, CancellationToken ct)
     {
-        return innerEval(b, depth, b.colorToMove == Piece.White, negInfinity, posInfinity, diagnostics, ct);
+        return InnerEval(b, depthRemain, b.colorToMove == Piece.White, negInfinity, posInfinity, diagnostics, ct);
     }
 
-    private static Result innerEval (Board b, int depth, bool maximizing, int alpha, int beta, EvalDiagnosticCount diagnostics, CancellationToken ct)
+    private static Result InnerEval (Board b, int depthRemain, bool maximizing, int alpha, int beta, EvalDiagnosticCount diagnostics, CancellationToken ct)
     {
         diagnostics.evalCount++;
         if(ct != null && ct.IsCancellationRequested) ct.ThrowIfCancellationRequested();
@@ -229,21 +232,26 @@ public static class Eval
         Move? principal = null;
         if(useTT && TranspositionTable.GetEntry(b.hash, out var entry))
         {
+            // Check for posion transposition principal
+            if (entry.principalMove.line.Count > 0 && maximizing != entry.principalMove.line.Peek().isWhiteMove)
+            {
+                Debug.Log($"Posioned Cache d={depthRemain} entryD={entry.depth} l={entry.principalMove.line.Count}");
+            }
             // The transposition was searched sufficiently (yay!)
-            if (entry.depth >= depth)
+            if (entry.depth >= depthRemain)
             {
                 // If the principal move is fully evaluated, we can return the result
                 if (entry.type == TranspositionTable.EntryType.Exact)
                 {
                     // The entry is fully evaluated and usable!
                     diagnostics.totalTransposeCount++;
-                    return entry.principalMove;
+                    return new Result(entry.principalMove);
                 }
                 // If the principal move had a beta cutoff, and causes a beta cutoff here as well, no need to evaluate further
-                if ((maximizing && entry.principalMove.intEval >= beta) || (!maximizing && entry.principalMove.intEval <= alpha))
+                if (entry.type == TranspositionTable.EntryType.BetaCutOff && ((maximizing && entry.principalMove.intEval >= beta) || (!maximizing && entry.principalMove.intEval <= alpha)))
                 {
                     diagnostics.betaTransposeCount++;
-                    return entry.principalMove;
+                    return new Result(entry.principalMove);
                 }
             }
 
@@ -255,7 +263,7 @@ public static class Eval
             }
         }
 
-        if (depth == 0)
+        if (depthRemain == 0)
         {
             diagnostics.leafCount++;
             if (useQS)
@@ -264,6 +272,10 @@ public static class Eval
             }
             int eval = staticEval(b);
             Result newResult = new Result(eval, true);
+            if (newResult.line.Count > 20)
+            {
+                Debug.Log("Wow!");
+            }
             TranspositionTable.AddNewEntry(b.hash, new TranspositionTable.TranspositionEntry(
                 b.hash,
                 0,
@@ -289,18 +301,17 @@ public static class Eval
         if (maximizing)
         {
             Result maxEval = null;
-            Move? optimal = null;
             bool pruned = false;
 
             foreach(Move move in moves)
             {
                 b.MakeMove(move);
-                var newEval = innerEval(b, depth - 1, false, alpha, beta, diagnostics, ct);
+                var newEval = InnerEval(b, depthRemain - 1, false, alpha, beta, diagnostics, ct);
 
                 if (maxEval == null || newEval > maxEval)
                 {
                     maxEval = newEval;
-                    optimal = move;
+                    maxEval.line.Push(move);
 
                     if(newEval > alpha)
                     {
@@ -316,30 +327,35 @@ public static class Eval
                 }
                 b.Undo();
             }
+
+            if (maxEval.line.Count > 0 && !maxEval.line.Peek().isWhiteMove)
+            {
+                // Since we are maximizing the move has to be max
+                Debug.Log("Incoherrent Move Caching: Black move when maximizing");
+            }
+            
             TranspositionTable.AddNewEntry(b.hash, new TranspositionTable.TranspositionEntry(
                 b.hash,
-                depth,
+                depthRemain,
                 b.turn,
                 pruned ? TranspositionTable.EntryType.BetaCutOff : TranspositionTable.EntryType.Exact,
                 new Result(maxEval)
                 ));
-            if (optimal != null) maxEval.line.Push((Move)optimal);
             return maxEval;
         }
         else
         {
             Result minEval = null;
-            Move? optimal = null;
             bool pruned = false;
 
             foreach (Move move in moves)
             {
                 b.MakeMove(move);
-                var newEval = innerEval(b, depth - 1, true, alpha, beta, diagnostics, ct);
+                var newEval = InnerEval(b, depthRemain - 1, true, alpha, beta, diagnostics, ct);
                 if (minEval == null || newEval < minEval)
                 {
                     minEval = newEval;
-                    optimal = move;
+                    minEval.line.Push(move);
 
                     if (newEval < beta)
                     {
@@ -356,15 +372,20 @@ public static class Eval
                 b.Undo();
             }
 
+            if (minEval.line.Count > 0 && minEval.line.Peek().isWhiteMove)
+            {
+                // Since we are minimizing the move has to be max
+                Debug.Log("Incoherrent Move Caching: White move when minimizing");
+            }
+
             TranspositionTable.AddNewEntry(b.hash, new TranspositionTable.TranspositionEntry(
                 b.hash,
-                depth,
+                depthRemain,
                 b.turn,
                 pruned ? TranspositionTable.EntryType.BetaCutOff : TranspositionTable.EntryType.Exact,
                 new Result(minEval)
                 ));
 
-            if (optimal != null) minEval.line.Push((Move)optimal);
             return minEval;
         }
     }

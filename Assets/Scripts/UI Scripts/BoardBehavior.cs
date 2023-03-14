@@ -63,7 +63,7 @@ public class BoardBehavior : MonoBehaviour
 
     private SpriteRenderer[] squareObjects = new SpriteRenderer[64];
     private List<GameObject> pieceObjects;
-    private Move highlight = new Move(-1, -1);
+    private Move highlight = new Move(-1, -1, true);
 
     // Flag to disable dragging pieces, for when player is in menu
     public bool pauseDrag = false;

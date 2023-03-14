@@ -227,11 +227,11 @@ public static class MoveGenerator
                     int targetPiece = b[target];
                     if(targetPiece == 0)
                     {
-                        if(targetSq == -1) moves.Add(new Move(knight, target));
+                        if(targetSq == -1) moves.Add(new Move(knight, target, b.colorToMove == Piece.White));
                     }
                     else if(!Piece.IsColor(targetPiece, pieceColor))
                     {
-                        if (targetSq == -1) prioMoves.Add(new Move(knight, target));
+                        if (targetSq == -1) prioMoves.Add(new Move(knight, target, b.colorToMove == Piece.White));
                     }
                 }
             }
@@ -261,13 +261,13 @@ public static class MoveGenerator
                     {
                         if(!Piece.IsColor(targetPiece, pieceColor))
                         {
-                            prioMoves.Add(new Move(piece, target));
+                            prioMoves.Add(new Move(piece, target, b.colorToMove == Piece.White));
                         }
                         break;
                     }
                     else
                     {
-                        moves.Add(new Move(piece, target));
+                        moves.Add(new Move(piece, target, b.colorToMove == Piece.White));
                     }
                 }
             }
@@ -324,7 +324,7 @@ public static class MoveGenerator
                 int transitSquare = isWhite ? 5 : 61;
                 if (!SearchForAttack(b, kingSquare, false) && !SearchForAttack(b, transitSquare, false))
                 {
-                    prioMoves.Add(new Move(kingPos, kingPos + 2, Move.MoveFlag.KingCastle));
+                    prioMoves.Add(new Move(kingPos, kingPos + 2, b.colorToMove == Piece.White, Move.MoveFlag.KingCastle));
                 }
             }
         }
@@ -349,7 +349,7 @@ public static class MoveGenerator
                 int transitSquare = isWhite ? 3 : 59;
                 if (!SearchForAttack(b, kingSquare, false) && !SearchForAttack(b, transitSquare, false))
                 {
-                    prioMoves.Add(new Move(kingPos, kingPos - 2, Move.MoveFlag.QueenCastle));
+                    prioMoves.Add(new Move(kingPos, kingPos - 2, b.colorToMove == Piece.White, Move.MoveFlag.QueenCastle));
                 }
             }
         }
@@ -368,7 +368,7 @@ public static class MoveGenerator
         // If the pawn is capturing towards the En Passant Square
         if (targetPiece == 0 && b.epSquare == target)
         {
-            prioMoves.Add(new Move(pawn, target, Move.MoveFlag.EP));
+            prioMoves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.EP));
         }
 
         // If there is a piece on the capturing square and belongs to the opponent
@@ -378,10 +378,10 @@ public static class MoveGenerator
             {
                 foreach (int promotion in promotionList)
                 {
-                    prioMoves.Add(new Move(pawn, target, Move.MoveFlag.Promotion, pieceColor | promotion));
+                    prioMoves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.Promotion, pieceColor | promotion));
                 }
             }
-            else prioMoves.Add(new Move(pawn, target));
+            else prioMoves.Add(new Move(pawn, target, b.colorToMove == Piece.White));
         }
 
         return false;
@@ -406,16 +406,16 @@ public static class MoveGenerator
                     {
                         foreach(int promotion in promotionList)
                         {
-                            prioMoves.Add(new Move(pawn, target, Move.MoveFlag.Promotion, pieceColor | promotion));
+                            prioMoves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.Promotion, pieceColor | promotion));
                         }
                     }
-                    else moves.Add(new Move(pawn, target));
+                    else moves.Add(new Move(pawn, target, b.colorToMove == Piece.White));
 
                     // Double Pawn Move
                     if(pawn / 8 == 1)
                     {
                         target += 8;
-                        if(b[target] == 0) moves.Add(new Move(pawn, target, Move.MoveFlag.Double));
+                        if(b[target] == 0) moves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.Double));
                     }
                 }
             }
@@ -438,16 +438,16 @@ public static class MoveGenerator
                     {
                         foreach (int promotion in promotionList)
                         {
-                            prioMoves.Add(new Move(pawn, target, Move.MoveFlag.Promotion, pieceColor | promotion));
+                            prioMoves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.Promotion, pieceColor | promotion));
                         }
                     }
-                    else moves.Add(new Move(pawn, target));
+                    else moves.Add(new Move(pawn, target, b.colorToMove == Piece.White));
 
                     // Double Pawn Move
                     if (pawn / 8 == 6)
                     {
                         target -= 8;
-                        if (b[target] == 0) moves.Add(new Move(pawn, target, Move.MoveFlag.Double));
+                        if (b[target] == 0) moves.Add(new Move(pawn, target, b.colorToMove == Piece.White, Move.MoveFlag.Double));
                     }
                 }
             }
