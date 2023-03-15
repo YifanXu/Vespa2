@@ -36,10 +36,11 @@ public class GameController : MonoBehaviour
     [Header("AI Settings")]
     public bool aiAlwaysMove = false;
     public bool clearTTBetweenMove = true;
+    public bool useQS = true;
+    public bool useTT = true;
     public int aiColor = Piece.Black;
     public int aiDepth = 6;
-    public int aiMaxDepth = 20;
-    public int aiMinTime = 1000;
+
     private EngineResultSuite? latestResult = null;
     private Eval.EvalDiagnosticCount liveDiagnostics = null;
 
@@ -58,13 +59,12 @@ public class GameController : MonoBehaviour
     void Start()
     {
         MoveGenerator.Init();
-        Eval.Init();
+        Eval.Init(useQS, useTT);
         TranspositionTable.Init(1890860);
 
         board = new Board();
+        //board = new Board("r4k2/1pp4r/p2p1q1p/5bpQ/8/1BP1RN2/P2N1PPP/R5K1 w - - 4 22");
         //board = new Board("r2q1rk1/4bppp/p7/2p4N/Bn1pQ3/3P4/1PP3PP/R1B2RK1 w - - 4 21");
-        //board = new Board("r5r1/p7/bpk1p2p/1p1p1ppP/2qP4/2P2Q2/PRP1N1PB/3K3R w - - 0 1");
-        //board = new Board("5rk1/pQ3p1p/2p3p1/4brq1/2B5/2P4P/PP3PP1/3R1RK1 w - - 1 22");
         boardObject.RenderPieces(board.squares);
 
         // Generate Moves
@@ -79,6 +79,8 @@ public class GameController : MonoBehaviour
         // Init Cancellation Tokens;
         cancelTokenSource = new CancellationTokenSource();
         cancelToken = cancelTokenSource.Token;
+
+        // Check if AI needs to make the first move
     }
 
     // Update is called once per frame
@@ -144,6 +146,11 @@ public class GameController : MonoBehaviour
         }
     }
 
+    public void Restart()
+    {
+
+    }
+
     public void CopyMoveHistory ()
     {
         GUIUtility.systemCopyBuffer = Regex.Replace(moveHistoryOutput.text, "\\s+", " ");
@@ -163,8 +170,8 @@ public class GameController : MonoBehaviour
             castleStr += (board.castleAvaliability & castleLetter) != 0 ? "o" : "-";
             castleLetter /= 2;
         }
-        string s = $"Turn={board.turn}({(board.colorToMove == Piece.White ? "white" : "black")})\nHistoryStackCount={board.moveHistory.Count}\nCastle={castleStr}\nHalfMove={board.halfMoveClock}\nEP={board.epSquare}\n\n";
-        s += $"\"{board.ToString()}\"\n";
+        string s = $"\"{board}\"\n\n";
+        s += $"Turn={board.turn}({(board.colorToMove == Piece.White ? "white" : "black")})\nHistoryStackCount={board.moveHistory.Count}\nCastle={castleStr}\nHalfMove={board.halfMoveClock}\nEP={board.epSquare}\n\n";
         s += $"Hash = {TranspositionTable.HashToHex(board.hash, 16)}\n";
         s += $"FreshHash = {TranspositionTable.HashToHex((new Board(board.ToString())).hash, 16)}\n";
         s += $"TT Table = {TranspositionTable.hashTableOccupancy}/{TranspositionTable.tableSize}\n";
@@ -176,18 +183,27 @@ public class GameController : MonoBehaviour
             s += $"Static Eval(Normal) = {Eval.staticEval(board)}\n\n";
 
             // AI Last Justification
-            s += "AI Last Move:\n";
             if (latestResult != null) {
+                s += "AI Performance:\n";
                 s += $"AI Evaluation = {(float)(latestResult.Value.evalResult.intEval) / 100f}\n";
-                s += $"{latestResult.Value.diagnostics.evalCount} Evals ({latestResult.Value.diagnostics.staticEvalcount} leaf)\n";
-                s += $"({latestResult.Value.diagnostics.quiscenceCount} QSearch (-{latestResult.Value.diagnostics.quiscenceForceStop}), {latestResult.Value.diagnostics.staticEvalcount} staticEvals)\n";
-                s += $"(T1={latestResult.Value.diagnostics.totalTransposeCount}, T2={latestResult.Value.diagnostics.betaTransposeCount} T3={latestResult.Value.diagnostics.secondaryTransposecount})\n";
                 s += $"Time Elapsed: {latestResult.Value.timeElapsed.ToString(@"m\:ss\.fff")}\n";
+                int nodesTotal = latestResult.Value.diagnostics.evalCount + latestResult.Value.diagnostics.quiscenceCount;
+                s += $"{nodesTotal} nodes total ({Math.Floor(nodesTotal / latestResult.Value.timeElapsed.TotalSeconds / 1000)}KN/s)\n";
+                s += $"{latestResult.Value.diagnostics.evalCount} Standard Evals ({latestResult.Value.diagnostics.evalCount * 100 / nodesTotal}%)\n";
+                s += $"({latestResult.Value.diagnostics.quiscenceCount} QSearch (-{latestResult.Value.diagnostics.quiscenceForceStop}))\n";
+                s += $"{latestResult.Value.diagnostics.staticEvalcount} staticEvals\n";
+                s += $"Transposition:\nTotal={latestResult.Value.diagnostics.totalTransposeCount}\nBetaTotal={latestResult.Value.diagnostics.betaTransposeCount}\nRef={latestResult.Value.diagnostics.secondaryTransposecount}\n\n";
+
+                s += $"Engine Line:\n";
                 var line = latestResult.Value.evalResult.line;
                 while (line.Count > 0)
                 {
                     s += line.Pop().ToString() + "\n";
                 }
+            }
+            else
+            {
+                s += "No Engine Diagnostics Avaliable\n";
             }
             s += "\n";
         }
@@ -378,7 +394,7 @@ public class GameController : MonoBehaviour
         timer.Start();
 
         Eval.Result result = null;
-        for (int i = 2; i <= aiDepth * 2 || timer.ElapsedMilliseconds < aiMinTime; i += 2)
+        for (int i = 2; i <= aiDepth * 2; i += 2)
         {
             result = Eval.Evaluate(board, i, liveDiagnostics, cancelToken);
             liveDiagnostics.latestDepth = i;

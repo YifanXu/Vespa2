@@ -51,6 +51,9 @@ TagManager:
   - name: SelectedPiece
     uniqueID: 224621335
     locked: 0
+  - name: MainUI
+    uniqueID: 2899285421
+    locked: 0
   - name: PromotionUI
     uniqueID: 1377310675
     locked: 0

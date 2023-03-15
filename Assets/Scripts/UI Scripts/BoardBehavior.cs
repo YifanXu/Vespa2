@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,6 +48,7 @@ public class BoardBehavior : MonoBehaviour
 
     [Header("Settings")]
     public float squareSize = 1f;
+    public bool flipped = false;
 
     [Header("Game Object References")]
     public GameController controller;
@@ -75,9 +77,12 @@ public class BoardBehavior : MonoBehaviour
         {
             for (int file = 0; file < 8; file++)
             {
-                var newSq = Instantiate(square, new Vector3((file - 3.5f) * squareSize, (rank - 3.5f) * squareSize, 0), new Quaternion());
+                var newSq = Instantiate(square);
                 newSq.transform.SetParent(this.transform);
-                squareObjects[rank * 8 + file] = newSq.GetComponent<SpriteRenderer>();
+                newSq.transform.localPosition = new Vector3((file - 3.5f) * squareSize, (rank - 3.5f) * squareSize, 0);
+                int sqIndex = rank * 8 + file;
+                if (flipped) sqIndex = 63 - sqIndex;
+                squareObjects[sqIndex] = newSq.GetComponent<SpriteRenderer>();
             }
         }
 
@@ -88,6 +93,16 @@ public class BoardBehavior : MonoBehaviour
     void Update()
     {
         
+    }
+
+    public void Flip(Board b)
+    {
+        Move currentHL = highlight;
+        RenderHighlight(new Move(-1, -1, true));
+        Array.Reverse(squareObjects);
+        RenderSquares();
+        RenderHighlight(currentHL);
+        RenderPieces(b.squares);
     }
 
     public void RenderHighlight (Move move)
@@ -148,12 +163,14 @@ public class BoardBehavior : MonoBehaviour
             var sprite = pieceSprites[board[i]];
             if(sprite != null)
             {
-                var newPiece = Instantiate(piece, new Vector3((i % 8 - 3.5f) * squareSize, (i / 8 - 3.5f) * squareSize, 0), new Quaternion());
+                int sqIndex = flipped ? 63 - i : i; // Account for flip when calculating position
+                var newPiece = Instantiate(piece, new Vector3((sqIndex % 8 - 3.5f) * squareSize, (sqIndex / 8 - 3.5f) * squareSize, 0), new Quaternion());
                 newPiece.GetComponent<SpriteRenderer>().sprite = sprite;
                 pieceObjects.Add(newPiece);
 
                 var newPieceScript = newPiece.GetComponent<PieceBehavior>();
                 newPieceScript.location = i;
+                newPieceScript.flipped = flipped;
                 newPieceScript.homeLocation = newPiece.transform.position;
                 newPieceScript.sqSize = this.squareSize;
                 newPieceScript.moveTo = (move) => controller.MakeMove(move);

@@ -233,19 +233,20 @@ public class Board
         {
             if (!isWhite)
             {
-                if ((castleAvaliability & whiteKingAval) != 0 && move.target == 7) castleAvaliability ^= whiteKingAval;
-                if ((castleAvaliability & whiteQueenAval) != 0 && move.target == 0) castleAvaliability ^= whiteQueenAval;
+                if (move.target == 7) castleAvaliability &= ~(whiteKingAval);
+                if (move.target == 0) castleAvaliability &= ~(whiteQueenAval);
             }
             else
             {
-                if ((castleAvaliability & blackKingAval) != 0 && move.target == 63) castleAvaliability ^= blackKingAval;
-                if ((castleAvaliability & blackQueenAval) != 0 && move.target == 56) castleAvaliability ^= blackQueenAval;
+                if (move.target == 63) castleAvaliability &= ~(blackKingAval);
+                if (move.target == 56) castleAvaliability &= ~(blackQueenAval);
             }
         }
 
         if(movingPiece == (colorToMove | Piece.King))
         {
             // Update Castle Avaliablility (If King Moves, Disqualify both)
+            hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
             if (isWhite)
             {
                 if ((castleAvaliability & whiteKingAval) != 0) castleAvaliability ^= whiteKingAval;
@@ -256,20 +257,23 @@ public class Board
                 if ((castleAvaliability & blackKingAval) != 0) castleAvaliability ^= blackKingAval;
                 if ((castleAvaliability & blackQueenAval) != 0) castleAvaliability ^= blackQueenAval;
             }
+            hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
         }
         else if(movingPiece == (colorToMove | Piece.Rook))
         {
             // Update Castle Avliability If Rook
-            if(isWhite)
+            hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
+            if (isWhite)
             {
-                if ((castleAvaliability & whiteKingAval) != 0 && move.origin == 7) castleAvaliability ^= whiteKingAval;
-                if ((castleAvaliability & whiteQueenAval) != 0 && move.origin == 0) castleAvaliability ^= whiteQueenAval;
+                if (move.origin == 7) castleAvaliability &= ~(whiteKingAval);
+                if (move.origin == 0) castleAvaliability &= ~(whiteQueenAval);
             }
             else
             {
-                if ((castleAvaliability & blackKingAval) != 0 && move.origin == 63) castleAvaliability ^= blackKingAval;
-                if ((castleAvaliability & blackQueenAval) != 0 && move.origin == 56) castleAvaliability ^= blackQueenAval;
+                if (move.origin == 63) castleAvaliability &= ~(blackKingAval);
+                if (move.origin == 56) castleAvaliability &= ~(blackQueenAval);
             }
+            hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
         }
         else if(movingPiece == (colorToMove | Piece.Pawn))
         {
@@ -304,18 +308,16 @@ public class Board
                 squares[kingRookOrigin] = 0;
 
                 // Update Castle Avaliability
-                hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
-                if (isWhite)
-                {
-                    if ((castleAvaliability & whiteKingAval) != 0) castleAvaliability ^= whiteKingAval;
-                    if ((castleAvaliability & whiteQueenAval) != 0) castleAvaliability ^= whiteQueenAval;
-                }
-                else
-                {
-                    if ((castleAvaliability & blackKingAval) != 0) castleAvaliability ^= blackKingAval;
-                    if ((castleAvaliability & blackQueenAval) != 0) castleAvaliability ^= blackQueenAval;
-                }
-                hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
+                //hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
+                //if (isWhite)
+                //{
+                //    castleAvaliability &= ~(whiteKingAval & whiteQueenAval);
+                //}
+                //else
+                //{
+                //    castleAvaliability &= ~(blackKingAval & blackQueenAval);
+                //}
+                //hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
 
                 // Update Hash
                 hash = TranspositionTable.HashTogglePiece(this.hash, kingRookId, kingRookOrigin);
@@ -328,7 +330,7 @@ public class Board
 
                 // Update Rook Table
                 var queenRookId = colorToMove | Piece.Rook;
-                var queenRookInfo = friendlyTable[colorToMove | Piece.Rook].pieceLocations;
+                var queenRookInfo = friendlyTable[queenRookId].pieceLocations;
                 queenRookInfo.Remove(queenRookOrigin);
                 queenRookInfo.Add(queenRookTarget);
 
@@ -340,13 +342,11 @@ public class Board
                 hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
                 if (isWhite)
                 {
-                    if ((castleAvaliability & whiteKingAval) != 0) castleAvaliability ^= whiteKingAval;
-                    if ((castleAvaliability & whiteQueenAval) != 0) castleAvaliability ^= whiteQueenAval;
+                    castleAvaliability &= ~(whiteKingAval & whiteQueenAval);
                 }
                 else
                 {
-                    if ((castleAvaliability & blackKingAval) != 0) castleAvaliability ^= blackKingAval;
-                    if ((castleAvaliability & blackQueenAval) != 0) castleAvaliability ^= blackQueenAval;
+                    castleAvaliability &= ~(blackKingAval & blackQueenAval);
                 }
                 hash = TranspositionTable.HashToggleCastleState(this.hash, castleAvaliability);
 

@@ -95,8 +95,8 @@ public static class Eval
         {Piece.Pawn, 100 }
     };
 
-    private const bool useTT = true;
-    private const bool useQS = true;
+    private static bool useTT = true;
+    private static bool useQS = true;
 
     private const int endgameMaterial = 16;
     private const int quiscenceSafetyMaterial = 0;
@@ -185,8 +185,10 @@ public static class Eval
     private const int posInfinity = int.MaxValue;
     private const int negInfinity = int.MinValue;
 
-    public static void Init ()
+    public static void Init (bool qs, bool tt)
     {
+        useQS = qs;
+        useTT = tt;
         // Generate piecePosTable
         piecePosTable = new Dictionary<int, int[]>()
         {
@@ -232,11 +234,6 @@ public static class Eval
         Move? principal = null;
         if(useTT && TranspositionTable.GetEntry(b.hash, out var entry))
         {
-            // Check for posion transposition principal
-            if (entry.principalMove.line.Count > 0 && maximizing != entry.principalMove.line.Peek().isWhiteMove)
-            {
-                Debug.Log($"Posioned Cache d={depthRemain} entryD={entry.depth} l={entry.principalMove.line.Count}");
-            }
             // The transposition was searched sufficiently (yay!)
             if (entry.depth >= depthRemain)
             {
@@ -327,12 +324,6 @@ public static class Eval
                 }
                 b.Undo();
             }
-
-            if (maxEval.line.Count > 0 && !maxEval.line.Peek().isWhiteMove)
-            {
-                // Since we are maximizing the move has to be max
-                Debug.Log("Incoherrent Move Caching: Black move when maximizing");
-            }
             
             TranspositionTable.AddNewEntry(b.hash, new TranspositionTable.TranspositionEntry(
                 b.hash,
@@ -370,12 +361,6 @@ public static class Eval
                     }
                 }
                 b.Undo();
-            }
-
-            if (minEval.line.Count > 0 && minEval.line.Peek().isWhiteMove)
-            {
-                // Since we are minimizing the move has to be max
-                Debug.Log("Incoherrent Move Caching: White move when minimizing");
             }
 
             TranspositionTable.AddNewEntry(b.hash, new TranspositionTable.TranspositionEntry(
