@@ -1,6 +1,4 @@
-Library/PackageCache
 /Build
-Library/Artifacts
-Library/ShaderCache
-Library/Il2cppBuildCache
-Library/il2cpp_cache*
+Library
+Logs
+obj
